@@ -1,6 +1,7 @@
-# AI Language Translation Tool
-## Project Overview
+# CodeAlpha AI Language Translator 
 The AI Language Translation Tool is a web-based application developed as part of the CodeAlpha Artificial Intelligence Internship.
+
+## Project Overview
 The application allows users to enter text, select source an target languages, translate the text using an online translator service, copy the translated result, and listen to the translated text using text-to-speech.
 
 ## Features
