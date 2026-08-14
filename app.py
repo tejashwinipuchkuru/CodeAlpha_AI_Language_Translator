@@ -1,7 +1,9 @@
 import streamlit as st
 from deep_translator import GoogleTranslator
 from gtts import gTTS
+import speech_recognition as sr
 import tempfile
+import io
 
 
 # -------------------------------------------------
@@ -45,6 +47,14 @@ st.markdown("""
     font-size: 20px;
 }
 
+.info-box {
+    padding: 12px;
+    border-radius: 10px;
+    background-color: #f0f7ff;
+    border: 1px solid #c9def5;
+    margin-bottom: 15px;
+}
+
 .footer {
     text-align: center;
     color: #777;
@@ -86,6 +96,64 @@ languages = {
 
 
 # -------------------------------------------------
+# SPEECH RECOGNITION LANGUAGE CODES
+# -------------------------------------------------
+
+speech_languages = {
+    "English": "en-US",
+    "Telugu": "te-IN",
+    "Hindi": "hi-IN",
+    "Tamil": "ta-IN",
+    "Kannada": "kn-IN",
+    "Malayalam": "ml-IN",
+    "Bengali": "bn-IN",
+    "Marathi": "mr-IN",
+    "Gujarati": "gu-IN",
+    "Punjabi": "pa-IN",
+    "Urdu": "ur-PK",
+    "French": "fr-FR",
+    "German": "de-DE",
+    "Spanish": "es-ES",
+    "Italian": "it-IT",
+    "Portuguese": "pt-PT",
+    "Russian": "ru-RU",
+    "Japanese": "ja-JP",
+    "Korean": "ko-KR",
+    "Chinese": "zh-CN",
+    "Arabic": "ar-SA"
+}
+
+
+# -------------------------------------------------
+# EXAMPLES FOR NATIVE LANGUAGE INPUT
+# -------------------------------------------------
+
+language_examples = {
+    "English": "Hello, how are you?",
+    "Telugu": "నమస్కారం, మీరు ఎలా ఉన్నారు?",
+    "Hindi": "नमस्ते, आप कैसे हैं?",
+    "Tamil": "வணக்கம், நீங்கள் எப்படி இருக்கிறீர்கள்?",
+    "Kannada": "ನಮಸ್ಕಾರ, ನೀವು ಹೇಗಿದ್ದೀರಿ?",
+    "Malayalam": "നമസ്കാരം, നിങ്ങൾക്ക് എങ്ങനെയുണ്ട്?",
+    "Bengali": "নমস্কার, আপনি কেমন আছেন?",
+    "Marathi": "नमस्कार, तुम्ही कसे आहात?",
+    "Gujarati": "નમસ્તે, તમે કેમ છો?",
+    "Punjabi": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਤੁਸੀਂ ਕਿਵੇਂ ਹੋ?",
+    "Urdu": "السلام علیکم، آپ کیسے ہیں؟",
+    "French": "Bonjour, comment allez-vous ?",
+    "German": "Hallo, wie geht es Ihnen?",
+    "Spanish": "Hola, ¿cómo estás?",
+    "Italian": "Ciao, come stai?",
+    "Portuguese": "Olá, como você está?",
+    "Russian": "Здравствуйте, как вы?",
+    "Japanese": "こんにちは、お元気ですか？",
+    "Korean": "안녕하세요, 어떻게 지내세요?",
+    "Chinese": "你好，你怎么样？",
+    "Arabic": "مرحباً، كيف حالك؟"
+}
+
+
+# -------------------------------------------------
 # HEADER
 # -------------------------------------------------
 
@@ -96,7 +164,8 @@ st.markdown(
 
 st.markdown(
     '<div class="subtitle">'
-    'Translate text instantly between multiple languages using AI-powered translation.'
+    'Translate text instantly between multiple languages using '
+    'text or voice input.'
     '</div>',
     unsafe_allow_html=True
 )
@@ -122,39 +191,213 @@ with col2:
 
 
 # -------------------------------------------------
+# INPUT METHOD
+# -------------------------------------------------
+
+st.subheader("📥 Choose Input Method")
+
+input_method = st.radio(
+    "How would you like to provide your text?",
+    ["⌨️ Type / Paste Text", "🎤 Record Voice"],
+    horizontal=True
+)
+
+
+# -------------------------------------------------
 # TEXT INPUT
 # -------------------------------------------------
 
-st.subheader("📝 Enter Your Text")
+text = ""
 
-text = st.text_area(
-    "Type or paste your text below:",
-    height=180,
-    placeholder="Example: Hello, how are you?"
-)
+if input_method == "⌨️ Type / Paste Text":
 
-if text:
-    st.caption(f"Characters: {len(text)}")
+    st.subheader("📝 Enter Your Text")
+
+    # Information message
+    if source_language == "Auto Detect":
+
+        st.markdown(
+            '<div class="info-box">'
+            '💡 <b>Auto Detect:</b> You can type or paste text '
+            'in any supported language. The application will '
+            'automatically detect the source language.'
+            '</div>',
+            unsafe_allow_html=True
+        )
+
+    else:
+
+        example = language_examples[source_language]
+
+        st.markdown(
+            f'<div class="info-box">'
+            f'💡 <b>Input language:</b> {source_language}<br>'
+            f'You can type or paste text using the '
+            f'{source_language} script.<br><br>'
+            f'<b>Example:</b> {example}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    text = st.text_area(
+        "Type or paste text in your selected source language:",
+        height=180,
+        placeholder=(
+            "Type or paste text here..."
+        )
+    )
+
+    if text:
+
+        st.caption(
+            f"Characters: {len(text)}"
+        )
+
+
+# -------------------------------------------------
+# VOICE INPUT
+# -------------------------------------------------
+
+elif input_method == "🎤 Record Voice":
+
+    st.subheader("🎤 Record Your Voice")
+
+    if source_language == "Auto Detect":
+
+        st.warning(
+            "⚠️ For voice input, please select the "
+            "language you are going to speak. "
+            "Auto Detect is currently available for "
+            "typed/pasted text."
+        )
+
+    else:
+
+        st.info(
+            f"🎤 Speak in {source_language}. "
+            f"The recording will be converted into "
+            f"{source_language} text before translation."
+        )
+
+    audio_value = st.audio_input(
+        "Click the microphone to record"
+    )
+
+    if audio_value is not None:
+
+        st.audio(
+            audio_value,
+            format="audio/wav"
+        )
+
+        recognizer = sr.Recognizer()
+
+        try:
+
+            audio_bytes = audio_value.getvalue()
+
+            audio_file = io.BytesIO(audio_bytes)
+
+            with sr.AudioFile(audio_file) as source:
+
+                audio_data = recognizer.record(source)
+
+            if source_language == "Auto Detect":
+
+                text = ""
+
+            else:
+
+                recognition_language = speech_languages[
+                    source_language
+                ]
+
+                with st.spinner(
+                    f"Converting {source_language} speech to text..."
+                ):
+
+                    text = recognizer.recognize_google(
+                        audio_data,
+                        language=recognition_language
+                    )
+
+                st.success(
+                    "✅ Speech converted to text successfully!"
+                )
+
+                st.subheader("📝 Recognized Text")
+
+                st.text_area(
+                    "Your recorded speech:",
+                    value=text,
+                    height=120,
+                    disabled=True
+                )
+
+        except sr.UnknownValueError:
+
+            st.error(
+                "❌ Sorry, I could not understand the audio. "
+                "Please speak clearly and try again."
+            )
+
+            text = ""
+
+        except sr.RequestError:
+
+            st.error(
+                "❌ Speech recognition service is unavailable. "
+                "Please check your internet connection."
+            )
+
+            text = ""
+
+        except Exception as e:
+
+            st.error(
+                f"❌ Could not process the audio: {str(e)}"
+            )
+
+            text = ""
 
 
 # -------------------------------------------------
 # TRANSLATE BUTTON
 # -------------------------------------------------
 
-if st.button("🚀 Translate", use_container_width=True):
+if st.button(
+    "🚀 Translate",
+    use_container_width=True
+):
 
-    # Check empty input
+    # Empty input
     if not text.strip():
 
-        st.warning("⚠️ Please enter some text before translating.")
+        st.warning(
+            "⚠️ Please enter text or record your voice "
+            "before translating."
+        )
 
-    # Check same language
+    # Same language
     elif (
         source_language != "Auto Detect"
         and source_language == target_language
     ):
 
-        st.info("ℹ️ Source and target languages are the same.")
+        st.info(
+            "ℹ️ Source and target languages are the same."
+        )
+
+    # Voice + Auto Detect
+    elif (
+        input_method == "🎤 Record Voice"
+        and source_language == "Auto Detect"
+    ):
+
+        st.warning(
+            "⚠️ Please select the language you are "
+            "speaking before using voice input."
+        )
 
     else:
 
@@ -162,7 +405,7 @@ if st.button("🚀 Translate", use_container_width=True):
 
             with st.spinner("Translating..."):
 
-                # Auto-detect source language
+                # Auto detection for typed text
                 if source_language == "Auto Detect":
 
                     translator = GoogleTranslator(
@@ -184,14 +427,19 @@ if st.button("🚀 Translate", use_container_width=True):
             # TRANSLATION RESULT
             # -------------------------------------------------
 
-            st.success("✅ Translation completed successfully!")
+            st.success(
+                "✅ Translation completed successfully!"
+            )
 
             st.subheader("🔄 Translated Text")
 
             st.markdown(
-                f'<div class="result-box">{translated_text}</div>',
+                f'<div class="result-box">'
+                f'{translated_text}'
+                f'</div>',
                 unsafe_allow_html=True
             )
+
 
             # -------------------------------------------------
             # COPY FEATURE
@@ -204,6 +452,7 @@ if st.button("🚀 Translate", use_container_width=True):
                 language=None
             )
 
+
             # -------------------------------------------------
             # TEXT TO SPEECH
             # -------------------------------------------------
@@ -212,12 +461,7 @@ if st.button("🚀 Translate", use_container_width=True):
 
             try:
 
-                # gTTS uses standard language codes
                 tts_language = languages[target_language]
-
-                # Some language codes need adjustment
-                if tts_language == "zh-CN":
-                    tts_language = "zh-CN"
 
                 speech = gTTS(
                     text=translated_text,
@@ -243,11 +487,13 @@ if st.button("🚀 Translate", use_container_width=True):
                     "for this language."
                 )
 
-        except Exception as e:
+
+        except Exception:
 
             st.error(
                 "❌ Translation failed. "
-                "Please check your internet connection and try again."
+                "Please check your internet connection "
+                "and try again."
             )
 
 
@@ -257,7 +503,8 @@ if st.button("🚀 Translate", use_container_width=True):
 
 st.markdown(
     '<div class="footer">'
-    'CodeAlpha AI Internship • Task 1 • Language Translation Tool'
+    'CodeAlpha AI Internship • Task 1 • '
+    'Language Translation Tool'
     '</div>',
     unsafe_allow_html=True
 )
